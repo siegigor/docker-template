@@ -1,0 +1,109 @@
+version: '3'
+services:
+    backend-nginx:
+        build:
+            context: ./backend/docker/development
+            dockerfile: nginx/Dockerfile
+        volumes:
+            - ./backend:/var/www/backend
+        depends_on:
+            - php-fpm
+        ports:
+            - "8080:80"
+            - "8081:443"
+
+    php-fpm:
+        build:
+            context: ./backend/docker/development
+            dockerfile: php/fpm/Dockerfile
+        volumes:
+            - ./backend:/var/www/backend
+        depends_on:
+            - postgres
+            - redis
+            - mailer
+
+    php-cli:
+        build:
+            context: ./backend/docker/development
+            dockerfile: php/cli/Dockerfile
+        volumes:
+            - ./backend:/var/www/backend
+            - composer:/root/.composer/cache
+        depends_on:
+            - postgres
+            - redis
+            - mailer
+        tty: true
+
+    backend-node:
+        image: node:12.7-alpine
+        volumes:
+            - ./backend:/var/www/backend
+        working_dir: /var/www/backend
+
+    postgres:
+        image: postgres:11.2-alpine
+        volumes:
+            - postgres:/var/lib/postgresql/data
+        environment:
+            POSTGRES_USER: app
+            POSTGRES_PASSWORD: secret
+            POSTGRES_DB: app
+        ports:
+            - "54321:5432"
+
+    redis:
+        image: redis:5.0-alpine
+        volumes:
+            - redis:/data
+        command:
+            - 'redis-server'
+            - '--databases 2'
+            - '--save 900 1'
+            - '--save 300 10'
+            - '--save 60 10000'
+            - '--requirepass secret'
+
+    mailer:
+        image: mailhog/mailhog
+        ports:
+            - "8082:8025"
+
+    frontend-nginx:
+        build:
+            context: ./frontend/docker/development
+            dockerfile: nginx/Dockerfile
+        volumes:
+            - ./frontend:/var/www/frontend
+        depends_on:
+            - php-fpm
+        ports:
+            - "8085:80"
+            - "8086:443"
+
+    frontend-nodejs:
+        image: node:10.11-jessie
+        volumes:
+            - ./frontend:/var/www/frontend
+        working_dir: /var/www/frontend
+        tty: true
+
+    websocket-nodejs:
+        image: node:10.11-jessie
+        volumes:
+            - ./websocket:/var/www/websocket
+        ports:
+            - "8084:8000"
+        working_dir: /var/www/websocket
+        depends_on:
+            - redis
+        environment:
+            - "REDIS_PORT=6379"
+            - "REDIS_HOST=redis"
+        tty: true
+
+volumes:
+    postgres:
+    redis:
+    composer:
